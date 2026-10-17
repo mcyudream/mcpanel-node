@@ -1,0 +1,55 @@
+# mcpanel-node container deployment (M1a direct mode baseline).
+#
+# Mounts are FIXED: only the docker socket and the /data named volume.
+# Arbitrary hostPath mounts are forbidden by policy and by the node's own
+# container-creation guardrails.
+#
+# Local development:
+#   docker compose -f node-compose.yml up -d   (after preparing config)
+#
+# The node TLS listener stays on the container network unless you publish it
+# explicitly (M1a: the panel dials wss://host:port/control; publish only on
+# a trusted network, never 0.0.0.0 on a public interface).
+services:
+  node:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+    image: mcpanel-node:local
+    container_name: mcpanel-node
+    restart: unless-stopped
+    volumes:
+      # Fixed, non-negotiable mounts only.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - mcpanel-node-data:/data
+      # Optional config.yaml: the image runs config-free (env MCNODE_PANEL_URL /
+      # MCNODE_ENROLL_TOKEN / MCNODE_DATA_DIR). Uncomment ONLY with the file
+      # actually present next to this compose file:
+      # - ./config.yaml:/etc/mcpanel-node/config.yaml:ro
+    ports:
+      # Direct-mode control channel. Keep the host bind on a private or
+      # loopback interface unless this node is intentionally reachable.
+      - "${NODE_BIND_ADDR:-127.0.0.1}:${NODE_BIND_PORT:-7443}:7443"
+      # SFTP port pool: ftp.open listens on 2121-2136 (instance-hash based).
+      # Must be published and reachable from the panel server — the SFTP
+      # gateway dials it back after client auth; credentials are random
+      # with a 2h TTL.
+      - "2121-2136:2121-2136"
+    environment:
+      MCNODE_DATA_DIR: /data
+      # Secrets via environment only (never bake into the image/config):
+      # MCNODE_ENROLL_TOKEN / MCNODE_FRPC_TOKEN as needed.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # 实例数据是 bind mount，文件属主由容器内镜像 uid（如 openjdk25 的 10001）
+      # 与节点侧写入共同决定；root 丢掉 DAC_OVERRIDE 后按普通用户判 DAC，对属主
+      # 不匹配的文件读/写 EACCES，chmod 亦 EPERM（无法自救）。节点已挂
+      # docker.sock（宿主 root 等价，见 docs/threat-model.md），补回该 cap 的边际
+      # 风险≈0，与实例容器 CapAdd=InstanceCapAdd 的策略对齐。
+      - DAC_OVERRIDE
+
+volumes:
+  mcpanel-node-data:

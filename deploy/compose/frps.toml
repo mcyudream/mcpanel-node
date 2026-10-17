@@ -1,0 +1,15 @@
+# frps config (M1b experimental relay). Token is injected via the
+# --token command line from the FRPS_TOKEN environment variable by
+# frps-compose.yml; it must not be written here.
+bindAddr = "0.0.0.0"
+bindPort = 7000
+proxyBindAddr = "0.0.0.0"
+
+# Hard cap on which ingress ports frpc clients may register.
+# The panel-side pool for node tunnels lives inside this range.
+[[allowPorts]]
+start = 7100
+end = 7110
+
+# No webServer section: the frps dashboard must not be started.
+# heartbeats/transport use frp defaults.

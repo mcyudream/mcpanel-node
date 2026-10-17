@@ -1,0 +1,36 @@
+# build output
+/dist/
+/mcpanel-node
+/mcpanel-node.exe
+
+# runtime data (credentials, generated TLS certs) must never be committed
+/data/
+*.credential.json
+*.credential.out
+
+# acceptance/test artifacts (issued test credentials, node logs)
+.acceptance/data/
+*.log
+
+# local env files (tokens)
+.env
+.env.*
+
+# go
+*.test
+coverage.out
+coverage.txt
+
+# business smoke data (host-visible bind source)
+.smoke-data/
+.smoke-data-panel/
+.dev-node/
+.panel-smoke-conn.env
+
+# local toolchain / dev artifacts (never publish)
+.toolchain/
+.dev-build/
+node-data/
+node-data;C/
+mcpanel-node-linux
+*.exe

@@ -1,0 +1,29 @@
+# Panel-side frps (M1b NAT relay, EXPERIMENTAL — not production enabled).
+#
+# Scope rules (enforced by review, not just by comment):
+#   - FRPS_TOKEN comes from the environment / .env file; NEVER commit it.
+#   - The frp token isolates local experiments only; it is not a production
+#     credential and must not be shared beyond this frps instance.
+#   - No dashboard / admin webServer configured: nothing but the frp control
+#     port is exposed.
+#   - allowPorts limits which ingress ports frpc clients may occupy.
+#
+# Start: FRPS_TOKEN=<random> docker compose -f frps-compose.yml up -d
+services:
+  frps:
+    image: snowdreamtech/frps:latest
+    container_name: mcpanel-frps
+    restart: unless-stopped
+    command: ["-c", "/etc/frp/frps.toml", "--token", "${FRPS_TOKEN:?FRPS_TOKEN required}"]
+    volumes:
+      - ./frps.toml:/etc/frp/frps.toml:ro
+    ports:
+      # frp control port (frpc dials out to this). Bind explicitly.
+      - "${FRPS_BIND_ADDR:-127.0.0.1}:${FRPS_BIND_PORT:-7000}:7000"
+      # Ingress proxy port range for node tunnels. Only loopback by default
+      # so a local lab never becomes publicly reachable by accident.
+      - "${FRPS_BIND_ADDR:-127.0.0.1}:7100-7110:7100-7110"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

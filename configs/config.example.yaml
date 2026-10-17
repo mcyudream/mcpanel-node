@@ -1,0 +1,4 @@
+# SecurityConfig：节点机 shell 终端开关（危险能力，默认关闭）。
+# 面板「节点终端」需要 terminalEnabled: true，并重启 agent。
+security:
+  terminalEnabled: false

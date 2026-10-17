@@ -1,0 +1,19 @@
+dist/
+data/
+*.data/
+.acceptance/data/
+.env
+*.log
+node.log
+.git/
+.gitignore
+docs/
+scripts/smoke.sh
+# local build/dev artifacts: never needed by the image build, and .toolchain
+# alone is ~400MB of context transfer (Windows bind mounts make it painful).
+.toolchain/
+node-data/
+.dev-build/
+mcpanel-node-linux
+mcpanel-node.exe
+*.exe

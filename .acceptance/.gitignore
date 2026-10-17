@@ -1,0 +1,4 @@
+*
+!.gitignore
+!gen-cert.sh
+!run-acceptance.sh
