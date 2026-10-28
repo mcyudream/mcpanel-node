@@ -73,7 +73,7 @@ func (f *fakeEngine) Create(_ context.Context, _ string, spec dockerx.ContainerS
  f.created = append(f.created, spec)
  // 与真实 Docker 行为一致：容器回填 create 时请求的 capability 策略。
  f.byContainer[id] = dockerx.ContainerState{ID: id, State: "created", Labels: labelOf(spec),
-  CapAdd: dockerx.InstanceCapAdd, CapDrop: dockerx.InstanceCapDrop}
+  CapAdd: dockerx.InstanceCapAdd, CapDrop: dockerx.InstanceCapDrop, NanoCPUs: spec.CPUMillis * 1000000}
  f.containerOf[spec.InstanceID] = id
  return id, nil
 }

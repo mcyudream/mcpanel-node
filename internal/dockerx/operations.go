@@ -44,6 +44,7 @@ type ContainerState struct {
  Labels map[string]string `json:"labels"`
  CapAdd []string `json:"capAdd,omitempty"`
  CapDrop []string `json:"capDrop,omitempty"`
+ NanoCPUs int64 `json:"nanoCpus,omitempty"`
 }
 
 // InstanceCapAdd/InstanceCapDrop 实例容器的 capability 策略：全部丢弃后仅保留
@@ -100,7 +101,7 @@ func (c *Client) Create(ctx context.Context, name string, spec ContainerSpec)(st
  env:=make([]string,0,len(spec.Env));for k,v:=range spec.Env{env=append(env,k+"="+v)}
  hostConfig:=map[string]any{
   "Memory":spec.MemoryMb*1024*1024,"MemorySwap":spec.MemoryMb*1024*1024,
-  "NanoCpus":spec.CPUMillis*1000000,"PidsLimit":512,
+  "PidsLimit":512,
   // capability 策略集中在 InstanceCapAdd/InstanceCapDrop（含 CapsUpToDate
   // 存量检测），Create 与对齐逻辑共用，避免两处漂移。
   "CapDrop":InstanceCapDrop,"CapAdd":InstanceCapAdd,
@@ -109,6 +110,7 @@ func (c *Client) Create(ctx context.Context, name string, spec ContainerSpec)(st
   "Mounts":[]map[string]any{{"Type":"bind","Source":spec.DataPath,"Target":"/data","ReadOnly":false}},
   "LogConfig":map[string]any{"Type":"json-file","Config":map[string]string{"max-size":"10m","max-file":"3"}},
  }
+ if spec.CPUMillis>0 { hostConfig["NanoCpus"]=spec.CPUMillis*1000000 }
  // 继承宿主 /etc/hosts 的域名映射（节点容器需以 -v /etc/hosts:/etc/hosts:ro
  // 挂载；文件不存在时不注入，行为与旧版一致）。
  if extra:=HostsFileExtraHosts("/etc/hosts");len(extra)>0{hostConfig["ExtraHosts"]=extra}
@@ -156,9 +158,9 @@ func HostsFileExtraHosts(path string) []string {
 
 func (c *Client) Inspect(ctx context.Context,id string)(ContainerState,error){
  resp,err:=c.request(ctx,"GET","/containers/"+url.PathEscape(id)+"/json",nil);if err!=nil{return ContainerState{},err};defer resp.Body.Close()
- var v struct{ID string `json:"Id"`;State struct{Status string `json:"Status"`;Running bool `json:"Running"`;ExitCode int `json:"ExitCode"`} `json:"State"`;Config struct{Labels map[string]string `json:"Labels"`} `json:"Config"`;HostConfig struct{CapAdd []string `json:"CapAdd"`;CapDrop []string `json:"CapDrop"`} `json:"HostConfig"`}
+ var v struct{ID string `json:"Id"`;State struct{Status string `json:"Status"`;Running bool `json:"Running"`;ExitCode int `json:"ExitCode"`} `json:"State"`;Config struct{Labels map[string]string `json:"Labels"`} `json:"Config"`;HostConfig struct{CapAdd []string `json:"CapAdd"`;CapDrop []string `json:"CapDrop"`;NanoCPUs int64 `json:"NanoCpus"`} `json:"HostConfig"`}
  err=json.NewDecoder(io.LimitReader(resp.Body,2<<20)).Decode(&v)
- return ContainerState{v.ID,v.State.Status,v.State.ExitCode,v.State.Running,v.Config.Labels,v.HostConfig.CapAdd,v.HostConfig.CapDrop},err
+ return ContainerState{v.ID,v.State.Status,v.State.ExitCode,v.State.Running,v.Config.Labels,v.HostConfig.CapAdd,v.HostConfig.CapDrop,v.HostConfig.NanoCPUs},err
 }
 
 func(c *Client) Action(ctx context.Context,id,action string,seconds int)error{

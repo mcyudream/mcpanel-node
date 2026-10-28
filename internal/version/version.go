@@ -3,4 +3,4 @@ package version
 
 // Version is the mcpanel-node agent version. It is reported to the panel in
 // node.hello responses and node.stats events.
-const Version = "0.7.7"
+const Version = "0.7.9"

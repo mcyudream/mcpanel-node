@@ -67,3 +67,10 @@ ok  internal/wsserver    5.235s   # 握手 401/429/hello 一次/立即+5s stats 
 - 真实多级 NAT / UPnP 回探 / 公网直连：需真实公网入口与第二个物理网络；
   本地 compose 双网络仿真只验证隧道拓扑。
 - M1b frp 中继的生产授权机制：未实现，特性标记实验性，不在生产启用。
+
+
+## 0.7.9 回归范围
+
+自动化覆盖：真实 loopback SSH/SFTP 会话进入多级目录、读写/重命名/续传、撤销在用连接、父级符号链接越界拒绝；CPU 0 与非法范围、Docker 创建请求配额字段、显式启动对齐旧配额且启动对账不批量重启。
+
+运行：`go test ./... -count=1`、`go vet ./...`、`go build ./cmd/mcpanel-node`。loopback SFTP 使用真实协议客户端；Docker 请求测试使用本地 HTTP 测试服务。真实外部 SFTP 客户端与生产 Docker 节点升级仍需部署后验收。

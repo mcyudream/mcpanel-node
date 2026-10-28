@@ -8,6 +8,13 @@ MC 面板节点守护进程。Go 单二进制；提供 WSS 控制信道服务端
 相关仓库：[YuDream-Admin](https://github.com/mcyudream/YuDream-Admin)（插件式管理平台宿主）·
 [yudream-admin-plugins](https://github.com/mcyudream/yudream-admin-plugins)（官方插件，含 mcpanel 面板插件）。
 
+## 0.7.9 本次变更
+
+- SFTP `REALPATH` 按虚拟根返回实际子目录，恢复文件管理器进入多级目录；所有路径复用逐层符号链接边界检查。
+- 关闭或到期的 SFTP 会话会断开已经建立的连接，并通过 `ftp.close.live` 能力向面板声明支持撤销在用连接；续传打开文件不再隐式截断内容。
+- CPU `0` 通过规格校验，创建容器时省略 `NanoCpus`；正值仍限 100–256000 毫核。存量配额在显式启动或重启时对齐，节点启动对账不因此重启运行中实例。
+- 面板 0.24.0 可复用文件通道完成测试副本、覆盖/回退与 CE 资源安装；详见面板仓 `docs/mcpanel-resource-packages.md`。
+
 ## 功能概览
 
 - **控制信道**：WSS 服务端 `wss://<node>/control`，面板作为 WebSocket 客户端拨入；

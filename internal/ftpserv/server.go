@@ -10,9 +10,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/yudream/mcpanel-node/internal/fileutil"
 	"io"
 	"net"
 	"os"
+	virtualpath "path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -142,6 +144,15 @@ func (m *Manager) Close(instanceID string) bool {
 
 func (m *Manager) handleConn(ctx context.Context, conn net.Conn, sess *session) {
 	defer conn.Close()
+	finished := make(chan struct{})
+	defer close(finished)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close() // Revoke established sessions as well as new logins.
+		case <-finished:
+		}
+	}()
 	cfg := &ssh.ServerConfig{
 		PasswordCallback: func(meta ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
 			if meta.User() == sess.user && subtleEqual(string(password), sess.password) {
@@ -274,7 +285,7 @@ func (r *rootedChannel) Filecmd(request *sftp.Request) error {
 }
 
 func (r *rootedChannel) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
-	if request.Method != "List" && request.Method != "Stat" && request.Method != "Readlink" {
+	if request.Method != "List" && request.Method != "Stat" && request.Method != "Lstat" {
 		return nil, sftp.ErrSshFxOpUnsupported
 	}
 	full, err := ResolveSafe(r.root, request.Filepath)
@@ -285,7 +296,7 @@ func (r *rootedChannel) Filelist(request *sftp.Request) (sftp.ListerAt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !fi.IsDir() || request.Method == "Stat" {
+	if !fi.IsDir() || (request.Method == "Stat" || request.Method == "Lstat") {
 		// Stat（或非目录）只返回目标自身；List 不夹带目录自身条目。
 		return &listEntry{entries: []os.FileInfo{fi}}, nil
 	}
@@ -341,15 +352,28 @@ func (r *rootedChannel) Filewrite(request *sftp.Request) (io.WriterAt, error) {
 	if err != nil {
 		return nil, err
 	}
-	flags := os.O_WRONLY | os.O_CREATE
-	if request.Pflags().Append == false {
+	flags := os.O_WRONLY
+	pflags := request.Pflags()
+	if pflags.Read {
+		flags = os.O_RDWR
+	}
+	if pflags.Creat {
+		flags |= os.O_CREATE
+	}
+	if pflags.Trunc {
 		flags |= os.O_TRUNC
+	}
+	if pflags.Excl {
+		flags |= os.O_EXCL
+	}
+	if pflags.Append {
+		flags |= os.O_APPEND
 	}
 	f, err := os.OpenFile(full, flags, 0644)
 	if err != nil {
 		return nil, err
 	}
-	return &closeWriter{f}, nil
+	return &closeWriter{File: f, appendMode: pflags.Append}, nil
 }
 
 func (r *rootedChannel) FilecmdSlurp(request *sftp.Request) error {
@@ -358,29 +382,46 @@ func (r *rootedChannel) FilecmdSlurp(request *sftp.Request) error {
 
 // RealPath 实现 RealPathFileLister：把客户端视角钉死在虚拟根 "/"（chroot
 // 语义）。客户端 realpath(".") 后将直接落在实例数据目录，不会看到宿主路径。
-func (r *rootedChannel) RealPath(path string) (string, error) {
-	return "/", nil
+func (r *rootedChannel) RealPath(value string) (string, error) {
+	clean := virtualpath.Clean("/" + value)
+	full, err := ResolveSafe(r.root, clean)
+	if err != nil {
+		return "", err
+	}
+	// Canonicalize existing links but return only the path within the virtual root.
+	if actual, err := filepath.EvalSymlinks(full); err == nil {
+		root, err := filepath.EvalSymlinks(r.root)
+		if err != nil {
+			return "", err
+		}
+		rel, err := filepath.Rel(root, actual)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "", fmt.Errorf("路径不允许超出实例目录")
+		}
+		return virtualpath.Clean("/" + filepath.ToSlash(rel)), nil
+	}
+	return clean, nil
 }
 
-type closeWriter struct{ *os.File }
+type closeWriter struct {
+	*os.File
+	appendMode bool
+}
+
+func (w *closeWriter) WriteAt(p []byte, offset int64) (int, error) {
+	if w.appendMode {
+		return w.File.Write(p)
+	}
+	return w.File.WriteAt(p, offset)
+}
 
 // ResolveSafe 供包内使用的防逃逸解析（fileutil.Resolve 的薄封装，避免循环依赖）。
 func ResolveSafe(root, rel string) (string, error) {
-	clean := filepath.Clean("/" + rel)
-	if strings.Contains(clean, "\x00") {
+	if strings.ContainsAny(rel, "\\\x00") || strings.Contains(rel, ":") {
 		return "", fmt.Errorf("路径含非法字符")
 	}
-	full := filepath.Join(root, clean)
-	if !strings.HasPrefix(full, root+string(filepath.Separator)) && full != root {
-		return "", fmt.Errorf("路径不允许超出实例目录")
-	}
-	if info, err := os.Lstat(full); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		target, lerr := filepath.EvalSymlinks(full)
-		if lerr == nil && !strings.HasPrefix(target, root+string(filepath.Separator)) && target != root {
-			return "", fmt.Errorf("路径不允许超出实例目录")
-		}
-	}
-	return full, nil
+	clean := virtualpath.Clean("/" + rel)
+	return fileutil.Resolve(root, strings.TrimPrefix(clean, "/"), false)
 }
 
 func removeAll(full, root string) error {

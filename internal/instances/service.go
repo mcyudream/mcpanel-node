@@ -254,7 +254,7 @@ func(s *Service) owned(ctx context.Context,r Record)(dockerx.ContainerState,erro
 // 生效；数据在 bind mount，容器无状态，重建零成本。返回重建后（或原样）的
 // 容器状态，调用方据此继续 start。
 func(s *Service) ensureContainerCurrent(ctx context.Context,r Record,state dockerx.ContainerState)(dockerx.ContainerState,error){
- if dockerx.CapsUpToDate(state.CapAdd,state.CapDrop){return state,nil}
+ if dockerx.CapsUpToDate(state.CapAdd,state.CapDrop)&&state.NanoCPUs==r.CPUMillis*1000000{return state,nil}
  s.closeStdin(r.InstanceID)
  if state.Running{_=s.engine.Action(ctx,state.ID,"kill",5)}
  if err:=s.engine.Remove(ctx,state.ID);err!=nil&&!dockerx.IsNotFound(err){return state,err}

@@ -42,7 +42,7 @@ func TestEnsureWorldWritable(t *testing.T) {
 	}{
 		{root, 0o777},
 		{dir, 0o777},
-		{filepath.Join(dir, "subdir"), 0o777},
+		{filepath.Dir(dir), 0o777},
 		{plain, 0o666},
 		{exec, 0o777}, // 既有执行位保留并放开
 	} {

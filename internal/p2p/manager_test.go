@@ -3,6 +3,7 @@ package p2p
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"testing"
@@ -143,6 +144,12 @@ func TestHandshakeRejectsWrongTicketAndUnknownSession(t *testing.T) {
 		}
 		_, _ = conn.Write([]byte(handshake))
 		line, _ := bufio.NewReader(conn).ReadString('\n')
+		// Reading ERR can precede the server's deferred session cleanup. Wait for
+		// the server to close, which also proves rejected sockets are torn down.
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+		if _, err := conn.Read(make([]byte, 1)); err != io.EOF {
+			t.Fatalf("%s: rejected connection must close: %v", name, err)
+		}
 		_ = conn.Close()
 		if line != "ERR unauthorized\n" && line != "ERR bad_handshake\n" {
 			t.Fatalf("%s: response = %q（必须被拒绝）", name, line)

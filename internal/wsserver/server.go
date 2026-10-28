@@ -468,7 +468,7 @@ func (s *Server) capsList() []string {
 			"instance.output.subscribe", "instance.output.unsubscribe", "evt:instance.output")
 	}
 	if s.ftp != nil {
-		caps = append(caps, "ftp.open", "ftp.close", "ftp.open.node", "ftp.close.node")
+		caps = append(caps, "ftp.open", "ftp.close", "ftp.close.live", "ftp.open.node", "ftp.close.node")
 	}
 	if s.termEnabled && s.shellterm != nil {
 		caps = append(caps, "node.terminal.open", "node.terminal.input", "node.terminal.close",
@@ -990,7 +990,7 @@ func (s *Server) Dispatch(ctx context.Context, method string, p map[string]any, 
 		s.pushSimpleEvent("ftp.opened", map[string]any{"instanceId": id, "port": opened.Port, "expiresAt": opened.ExpiresAt})
 		return map[string]any{"instanceId": id, "port": opened.Port, "user": opened.User,
 			"password": opened.Password, "expiresAt": opened.ExpiresAt}, nil
-	case "ftp.close":
+	case "ftp.close", "ftp.close.live":
 		if s.ftp == nil {
 			return nil, errors.New("SFTP 服务不可用")
 		}

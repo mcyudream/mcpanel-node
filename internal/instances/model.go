@@ -63,7 +63,7 @@ func (s Spec) Validate()error {
  if len(s.Command)==0||len(s.Command)>64{return errors.New("必须填写启动命令，参数最多64项")}
  total:=0;for _,v:=range s.Command{total+=len(v);if strings.ContainsRune(v,0){return errors.New("启动参数含非法字符")}}
  if total>8192{return errors.New("启动命令过长")}
- if s.MemoryMb<64||s.MemoryMb>1048576||s.CPUMillis<100||s.CPUMillis>256000||s.DiskMb<64||s.DiskMb>104857600{return errors.New("实例资源规格越界")}
+ if s.MemoryMb<64||s.MemoryMb>1048576||s.CPUMillis<0||(s.CPUMillis>0&&s.CPUMillis<100)||s.CPUMillis>256000||s.DiskMb<64||s.DiskMb>104857600{return errors.New("实例资源规格越界")}
  if len(s.Env)>64{return errors.New("环境变量最多64项")}
  for k,v:=range s.Env{if !envKey.MatchString(k)||len(v)>4096||strings.ContainsRune(v,0){return errors.New("环境变量格式无效")}}
  if len(s.Ports)>16{return errors.New("每实例最多16个端口")}
